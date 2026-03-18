@@ -3,50 +3,46 @@ const router = express.Router();
 const Complaint = require('./models/Complaint');
 const { analyzeComplaint } = require('./aiController');
 
-// GET all complaints
+// 1. GET all
 router.get('/', async (req, res) => {
   try {
     const complaints = await Complaint.find().sort({ createdAt: -1 });
     res.json(complaints);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: err.message });
   }
 });
 
-// POST a new complaint (The "Magic" Route)
+// 2. POST (AI Logic)
 router.post('/', async (req, res) => {
   try {
     const { text } = req.body;
-    
-    // 1. Get AI Analysis
     const aiResult = await analyzeComplaint(text);
-    
-    // 2. Map AI results to Schema
-    const newComplaint = new Complaint({
-      text: text,
-      category: aiResult.category,
-      severity: aiResult.severity,
-      sentiment: aiResult.sentiment,
-      summary: aiResult.summary,
-      suggestedReply: aiResult.suggestedReply
-    });
-
-    // 3. Save to MongoDB
-    const savedComplaint = await newComplaint.save();
-    res.status(201).json(savedComplaint);
+    const newComplaint = new Complaint({ text, ...aiResult });
+    await newComplaint.save();
+    res.status(201).json(newComplaint);
   } catch (err) {
-    console.error("❌ Route Error:", err.message);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: "AI Failed" });
   }
 });
 
-// DELETE a complaint
+// 3. PATCH (The new Escalation Route)
+router.patch('/:id', async (req, res) => {
+  try {
+    const updated = await Complaint.findByIdAndUpdate(req.params.id, { $set: req.body }, { new: true });
+    res.json(updated);
+  } catch (err) {
+    res.status(500).json({ error: "Update failed" });
+  }
+});
+
+// 4. DELETE
 router.delete('/:id', async (req, res) => {
   try {
     await Complaint.findByIdAndDelete(req.params.id);
     res.json({ message: "Resolved" });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ error: "Delete failed" });
   }
 });
 
