@@ -9,23 +9,27 @@ app.use(express.json());
 // API Route for Analysis
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
-  
-  // LOGIC: This is where you would call the Gemini SDK
-  // For the demo, we are using high-speed mock logic to show the UI flow
   try {
     const categories = ["Technical", "Billing", "Logistics", "Refund"];
-    const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+    const priorities = ["High", "Moderate", "Low"];
     
-    // Simulate AI processing delay
-    setTimeout(() => {
-      res.json({ 
-        text, 
-        category: randomCategory, 
-        analysis: `AI Insight: This issue identified as ${randomCategory}. Recommendation: Flag for immediate human review based on keywords: "${text.substring(0, 15)}..."`
-      });
-    }, 800);
+    // Logic: High priority for "damaged" or "refund", Low for "general"
+    let priority = "Moderate";
+    if (text.toLowerCase().includes("damaged") || text.toLowerCase().includes("urgent")) priority = "High";
+    if (text.toLowerCase().includes("how to") || text.toLowerCase().includes("query")) priority = "Low";
+
+    const slaTime = priority === "High" ? "2 Hours" : priority === "Moderate" ? "24 Hours" : "48 Hours";
+
+    res.json({ 
+      text, 
+      category: categories[Math.floor(Math.random() * categories.length)],
+      priority,
+      sla: slaTime,
+      timestamp: new Date().toLocaleTimeString(),
+      analysis: `AI Analysis: Issue flagged as ${priority} priority. Immediate resolution required within ${slaTime}.`
+    });
   } catch (err) {
-    res.status(500).json({ error: "AI Processing Failed" });
+    res.status(500).json({ error: "Analysis Failed" });
   }
 });
 
