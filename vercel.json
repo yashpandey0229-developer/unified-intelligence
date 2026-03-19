@@ -2,14 +2,11 @@
   "version": 2,
   "builds": [
     { "src": "server/server.js", "use": "@vercel/node" },
-    { "src": "client/package.json", "use": "@vercel/static-build", "config": { "distDir": "build" } }
+    { "src": "client/package.json", "use": "@vercel/static-build" }
   ],
-  "routes": [
-    { "src": "/api/analyze", "dest": "server/server.js", "methods": ["POST", "OPTIONS"] },
-    { "src": "/api/(.*)", "dest": "server/server.js" },
-    { "src": "/static/(.*)", "dest": "client/build/static/$1" },
-    { "src": "/manifest.json", "dest": "client/build/manifest.json" },
-    { "src": "/favicon.ico", "dest": "client/build/favicon.ico" },
-    { "src": "/(.*)", "dest": "client/build/index.html", "check": true }
+  "rewrites": [
+    { "source": "/api/analyze", "destination": "server/server.js" },
+    { "source": "/api/(.*)", "destination": "server/server.js" },
+    { "source": "/(.*)", "destination": "/client/$1" }
   ]
 }
