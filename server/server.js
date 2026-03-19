@@ -8,17 +8,16 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. Initialize Gemini 1.5 Flash 
-// (Using the standard initialization that works with current Vercel SDKs)
+// 1. Initialize Gemini 2.5 Flash
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 2. MongoDB Atlas Connection
+// 2. MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected Successfully"))
   .catch(err => console.log("❌ MongoDB Connection Error:", err));
 
 // 3. Complaint Schema
-const ComplaintSchema = new mongoose.Schema({
+const Complaint = mongoose.model('Complaint', new mongoose.Schema({
   text: String,
   category: String,
   priority: String,
@@ -27,74 +26,43 @@ const ComplaintSchema = new mongoose.Schema({
   analysis: String,
   draftReply: String,
   timestamp: { type: Date, default: Date.now }
-});
+}));
 
-const Complaint = mongoose.model('Complaint', ComplaintSchema);
-
-// 4. Health Check
-app.get('/', (req, res) => {
-  res.send("Unified Intelligence API is Live 🚀");
-});
-
-// 5. GET Route: Fetch data for the dashboard
+// 4. GET Route: Fetch all data from MongoDB for the Dashboard
 app.get('/api/complaints', async (req, res) => {
   try {
     const data = await Complaint.find().sort({ timestamp: -1 });
     res.json(data);
   } catch (err) {
-    res.status(500).json({ error: "Database Fetch Failed" });
+    res.status(500).json({ error: "Failed to fetch complaints" });
   }
 });
 
-// 6. POST Route: Analyze & Save
+// 5. POST Route: Analyze with Gemini 2.5 Flash and Save
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
-  
-  // Debug log for Vercel
-  console.log("API Key Check:", !!process.env.GEMINI_API_KEY);
+  if (!text) return res.status(400).json({ error: "Text is required" });
 
   try {
-    // We target gemini-1.5-flash as the most stable endpoint
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `Analyze this customer issue: "${text}". 
-    Return ONLY a JSON object with: 
-    "category" (Technical/Billing/Logistics), 
-    "priority" (High/Moderate/Low), 
-    "sla" (e.g. 2 Hours), 
-    "sentiment" (Negative/Neutral), 
-    "analysis" (3 professional bullet points), 
-    "draftReply" (An empathetic response).`;
+    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const prompt = `Analyze: "${text}". Return ONLY a JSON object: {"category":"...","priority":"...","sla":"...","sentiment":"...","analysis":"...","draftReply":"..."}`;
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
     const rawText = response.text();
 
-    // Cleaning logic to prevent JSON.parse errors
+    // Remove markdown code blocks if AI adds them
     const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
     const data = JSON.parse(cleanJson);
 
-    // Save to MongoDB
+    // Save to Database
     const newEntry = new Complaint({ text, ...data });
     await newEntry.save();
 
     res.json(newEntry);
-
   } catch (err) {
-    console.error("GEMINI_CRITICAL_LOG:", err.message);
-    
-    // SMART FALLBACK: If API fails, return intelligent placeholder so demo continues
-    const fallback = {
-      text,
-      category: text.toLowerCase().includes("money") ? "Billing" : "General",
-      priority: "Moderate",
-      sla: "24 Hours",
-      sentiment: "Neutral",
-      analysis: "• AI triage synchronization in progress.\n• Root cause: Operational latency.\n• Action: Flagged for immediate human review.",
-      draftReply: "We have received your request. Our team is investigating the matter and will update you shortly."
-    };
-    
-    res.status(200).json(fallback);
+    console.error("GEMINI_ERROR:", err.message);
+    res.status(500).json({ error: "AI Handshake Failed", message: err.message });
   }
 });
 
