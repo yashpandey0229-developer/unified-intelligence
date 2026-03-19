@@ -1,61 +1,51 @@
 const express = require('express');
 const cors = require('cors');
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Initialize Gemini 3 Flash
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
-  const input = text.toLowerCase();
 
   try {
-    // --- 1. SEVERITY & SLA LOGIC ---
-    let severity = "Moderate";
-    let sla = "24 Hours";
-    if (input.includes("broken") || input.includes("damaged") || input.includes("not working") || input.includes("urgent")) {
-      severity = "High";
-      sla = "2 Hours";
-    } else if (input.includes("delay") || input.includes("wrong")) {
-      severity = "Moderate";
-      sla = "12 Hours";
-    } else {
-      severity = "Low";
-      sla = "48 Hours";
-    }
+    // Using the Gemini 3 Flash model for superior reasoning and speed
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-3-flash",
+      generationConfig: { responseMimeType: "application/json" }
+    });
 
-    // --- 2. SENTIMENT & CATEGORY ---
-    let sentiment = "Neutral";
-    if (input.includes("angry") || input.includes("worst") || input.includes("terrible") || input.includes("!") ) {
-      sentiment = "Negative";
-    }
+    const prompt = `
+      Analyze this customer complaint: "${text}"
+      Return a JSON object with these exact keys:
+      "category": (Technical, Billing, or Logistics),
+      "priority": (High, Moderate, or Low),
+      "sla": (e.g., "2 Hours" for High, "24 Hours" for Low),
+      "sentiment": (Positive, Neutral, or Negative),
+      "analysis": (A concise 3-bullet 360-degree view covering Root Cause, Trend, and a unique Next-Best Action),
+      "draftReply": (A highly personalized, empathetic response to the customer).
+    `;
 
-    let category = "General";
-    if (input.includes("package") || input.includes("delivery")) category = "Logistics";
-    if (input.includes("refund") || input.includes("money") || input.includes("payment")) category = "Billing";
-    if (input.includes("app") || input.includes("login") || input.includes("website")) category = "Technical";
-
-    // --- 3. GEN-AI NEXT-BEST ACTION & DRAFT RESPONSE ---
-    // This simulates the Gemini "Suggested Action"
-    const nextAction = severity === "High" ? "Initiate immediate refund & flag for manager review." : "Send apology email and offer tracking update.";
-    const draftResponse = `Dear Customer, we sincerely apologize for the ${category} issue. Our team has flagged this as ${severity} priority and will resolve it within ${sla}.`;
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const data = JSON.parse(response.text());
 
     res.json({
       text,
-      category,
-      severity,
-      sentiment,
-      sla,
-      timestamp: new Date().toLocaleString(),
-      nextAction,
-      draftResponse,
-      analysis: `[360° View Analysis]\n\n• Trend: Detected increase in ${category} complaints.\n• Root Cause: Potential fulfillment center error.\n• Suggested Action: ${nextAction}\n\nDraft Reply: "${draftResponse}"`
+      ...data,
+      timestamp: new Date().toLocaleString()
     });
+
   } catch (err) {
-    res.status(500).json({ error: "AI Engine Failed" });
+    console.error("Gemini Error:", err);
+    res.status(500).json({ error: "Gemini 3 Flash Engine timed out. Check API Key." });
   }
 });
 
 const PORT = process.env.PORT || 8082;
-app.listen(PORT, () => console.log(`Backend Active on ${PORT}`));
+app.listen(PORT, () => console.log(`Gemini 3 Server Active on Port ${PORT}`));
