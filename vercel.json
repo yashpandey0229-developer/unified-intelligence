@@ -1,25 +1,16 @@
 {
   "version": 2,
   "builds": [
-    {
-      "src": "server/server.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "client/package.json",
-      "use": "@vercel/static-build",
-      "config": { "distDir": "build" }
-    }
+    { "src": "server/server.js", "use": "@vercel/node" },
+    { "src": "client/package.json", "use": "@vercel/static-build" }
   ],
   "routes": [
-    {
-      "src": "/api/(.*)",
-      "dest": "server/server.js"
+    { 
+      "src": "/api/analyze", 
+      "dest": "server/server.js",
+      "methods": ["POST", "OPTIONS"] 
     },
-    {
-      "src": "/(.*)",
-      "dest": "client/$1",
-      "check": true
-    }
+    { "src": "/api/(.*)", "dest": "server/server.js" },
+    { "src": "/(.*)", "dest": "client/$1", "check": true }
   ]
 }
