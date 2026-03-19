@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const mongoose = require('mongoose');
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 require('dotenv').config();
 
@@ -7,57 +8,52 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Initialize Gemini with the API Key from Environment Variables
+// 1. Initialize Gemini
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
+// 2. MongoDB Connection
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log("✅ MongoDB Connected Successfully"))
+  .catch(err => console.log("❌ MongoDB Connection Error:", err));
+
+// 3. Complaint Schema
+const Complaint = mongoose.model('Complaint', new mongoose.Schema({
+  text: String,
+  category: String,
+  priority: String,
+  sla: String,
+  sentiment: String,
+  analysis: String,
+  draftReply: String,
+  timestamp: { type: Date, default: Date.now }
+}));
+
+// 4. Analysis Route (Saves to DB)
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
-
-  if (!text) {
-    return res.status(400).json({ error: "No text provided for analysis." });
-  }
-
   try {
-    // Using gemini-1.5-flash for maximum stability and regional compatibility
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    const prompt = `
-      Analyze this customer complaint: "${text}"
-      Return ONLY a JSON object with these exact keys:
-      {
-        "category": "Technical" | "Billing" | "Logistics",
-        "priority": "High" | "Moderate" | "Low",
-        "sla": "e.g., 2 Hours",
-        "sentiment": "Positive" | "Neutral" | "Negative",
-        "analysis": "3 bullet points on Root Cause, Trend, and Next-Best Action",
-        "draftReply": "An empathetic response"
-      }
-    `;
-
+    const prompt = `Analyze: "${text}". Return ONLY JSON: {category, priority, sla, sentiment, analysis, draftReply}`;
+    
     const result = await model.generateContent(prompt);
     const response = await result.response;
-    let rawText = response.text();
-    
-    // Clean-up: Remove markdown code blocks if Gemini includes them
-    const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const data = JSON.parse(cleanJson);
+    const data = JSON.parse(response.text().replace(/```json|```/g, "").trim());
 
-    res.json({
-      text,
-      ...data,
-      timestamp: new Date().toLocaleString()
-    });
+    // Save to MongoDB
+    const newEntry = new Complaint({ text, ...data });
+    await newEntry.save();
 
+    res.json(newEntry);
   } catch (err) {
-    console.error("Gemini Engine Error:", err);
-    // Returning a detailed error helps us debug in Vercel Logs
-    res.status(500).json({ 
-      error: "Gemini Engine Error", 
-      message: err.message 
-    });
+    res.status(500).json({ error: "AI Engine Error", details: err.message });
   }
 });
 
-// Use port 8082 for local dev, Vercel handles the production port
+// 5. Fetch Route (For Cross-Device Sync)
+app.get('/api/complaints', async (req, res) => {
+  const data = await Complaint.find().sort({ timestamp: -1 });
+  res.json(data);
+});
+
 const PORT = process.env.PORT || 8082;
-app.listen(PORT, () => console.log(`Backend Active on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Backend Pro on Port ${PORT}`));
