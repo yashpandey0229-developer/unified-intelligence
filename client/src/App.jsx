@@ -11,7 +11,7 @@ function App() {
     fetch('/api/complaints')
       .then(res => res.json())
       .then(data => setComplaints(Array.isArray(data) ? data : []))
-      .catch(() => console.log("Database Syncing..."));
+      .catch(() => console.log("Syncing..."));
   }, []);
 
   const handleAnalyze = async () => {
@@ -26,62 +26,52 @@ function App() {
       const data = await res.json();
       setComplaints(prev => [data, ...prev]);
       setInput("");
-    } catch (err) { alert("AI Handshake Failed"); }
+    } catch (err) { alert("AI Error"); }
     setLoading(false);
   };
 
   const handleResolve = async (id) => {
-    if (!window.confirm("Permanent Archive & Purge?")) return;
+    if (!window.confirm("Delete this resolved ticket?")) return;
     try {
-      const res = await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
-      if (res.ok) setComplaints(complaints.filter(c => c._id !== id));
+      await fetch(`/api/complaints/${id}`, { method: 'DELETE' });
+      setComplaints(complaints.filter(c => c._id !== id));
     } catch (err) { alert("Delete failed"); }
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans">
+    <div className="min-h-screen bg-slate-50">
       <SignedOut>
-        <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white p-6 text-center">
-          <h1 className="text-4xl font-black italic mb-8">Unified Intelligence</h1>
-          <SignInButton className="bg-blue-600 px-12 py-5 rounded-2xl font-black text-xl hover:bg-blue-700 shadow-2xl transition-all" />
-          <p className="mt-6 text-slate-500 font-bold uppercase text-[10px] tracking-widest">Enterprise Auth Required</p>
+        <div className="flex flex-col items-center justify-center h-screen bg-slate-900 text-white">
+          <h1 className="text-3xl font-bold mb-8 italic">Unified Intelligence</h1>
+          <SignInButton className="bg-blue-600 px-8 py-4 rounded-xl font-bold hover:bg-blue-700" />
         </div>
       </SignedOut>
 
       <SignedIn>
-        <nav className="max-w-4xl mx-auto flex justify-between items-center p-4 bg-white mt-4 rounded-2xl border shadow-sm">
-          <span className="font-black italic text-slate-300 text-[10px] tracking-widest uppercase">Manager Session Active</span>
+        <nav className="p-4 flex justify-between bg-white border-b max-w-4xl mx-auto mt-4 rounded-xl shadow-sm">
+          <h2 className="font-black italic">COMMAND CENTER</h2>
           <UserButton afterSignOutUrl="/" />
         </nav>
-
         <main className="max-w-4xl mx-auto p-6">
-          <div className="bg-slate-900 rounded-[2.5rem] p-10 text-white mb-10 shadow-xl">
-            <h1 className="text-3xl font-black italic tracking-tighter">Unified Intelligence</h1>
-            <p className="text-blue-400 text-[10px] uppercase tracking-[0.3em] mt-2 font-black">SLA Triage Command</p>
-          </div>
-
-          <div className="bg-white rounded-[2rem] p-8 shadow-sm border border-slate-200 mb-10">
-            <textarea className="w-full p-6 bg-slate-50 border border-slate-100 rounded-3xl mb-4 min-h-[140px] outline-none" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Analyze issue..."/>
-            <button onClick={handleAnalyze} disabled={loading} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-lg hover:bg-blue-700 transition-all">
-              {loading ? "GEMINI 2.5 ANALYZING..." : "ANALYZE WITH GEMINI"}
+          <div className="bg-white p-8 rounded-3xl shadow-sm border mb-8">
+            <textarea className="w-full p-4 bg-slate-50 rounded-xl mb-4 h-32 border outline-none" value={input} onChange={(e) => setInput(e.target.value)} placeholder="Analyze customer issue..."/>
+            <button onClick={handleAnalyze} disabled={loading} className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold transition-all hover:bg-blue-700">
+              {loading ? "GEMINI 2.5 ANALYZING..." : "ANALYZE WITH AI"}
             </button>
           </div>
-
-          <div className="space-y-6">
-            {complaints.map((c) => (
-              <div key={c._id} className="bg-white p-7 rounded-[2rem] border border-slate-100 shadow-sm hover:shadow-md transition-all">
-                <div className="flex justify-between items-center mb-5">
-                  <span className={`px-3 py-1 rounded text-[10px] font-black uppercase ${c.priority === 'High' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}`}>
-                    {c.priority} Priority
-                  </span>
-                  <span className="text-[10px] font-black text-slate-300 uppercase">SLA: {c.sla}</span>
+          <div className="space-y-4">
+            {complaints.map(c => (
+              <div key={c._id} className="bg-white p-6 rounded-2xl border shadow-sm transition-all hover:shadow-md">
+                <div className="flex justify-between mb-2">
+                  <span className={`text-[10px] font-black uppercase ${c.priority === 'High' ? 'text-red-600' : 'text-blue-600'}`}>{c.priority} Priority</span>
+                  <span className="text-[10px] font-bold text-slate-400">SLA: {c.sla}</span>
                 </div>
-                <p className="text-slate-700 font-medium mb-8">"{c.text}"</p>
-                <div className="flex justify-between items-center pt-6 border-t border-slate-50">
-                  <button onClick={() => setSelectedCase(c)} className="text-blue-600 text-xs font-black hover:underline uppercase">View AI 360°</button>
-                  <div className="flex gap-3">
-                    <button onClick={() => handleResolve(c._id)} className="bg-emerald-50 text-emerald-600 border border-emerald-100 px-5 py-2 rounded-xl text-[10px] font-black hover:bg-emerald-600 hover:text-white transition-all">RESOLVE</button>
-                    <button className="bg-slate-900 text-white px-5 py-2 rounded-xl text-[10px] font-black uppercase">Escalate</button>
+                <p className="text-slate-700 font-medium">"{c.text}"</p>
+                <div className="flex justify-between border-t mt-5 pt-4">
+                  <button onClick={() => setSelectedCase(c)} className="text-blue-600 text-xs font-black hover:underline">360° VIEW</button>
+                  <div className="flex gap-2">
+                    <button onClick={() => handleResolve(c._id)} className="bg-emerald-600 text-white px-4 py-2 rounded-lg text-[10px] font-black hover:bg-emerald-700">RESOLVE</button>
+                    <button className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black">ESCALATE</button>
                   </div>
                 </div>
               </div>
@@ -89,21 +79,7 @@ function App() {
           </div>
         </main>
       </SignedIn>
-
-      {selectedCase && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-6">
-          <div className="bg-white rounded-[3rem] max-w-lg w-full p-10 shadow-2xl">
-            <h3 className="text-2xl font-black mb-6 uppercase tracking-tighter">AI Analysis</h3>
-            <p className="bg-slate-50 p-6 rounded-2xl text-slate-600 mb-8 italic">"{selectedCase.analysis}"</p>
-            <div className="bg-emerald-50 p-6 rounded-2xl mb-10">
-               <p className="text-emerald-800 font-bold text-sm leading-relaxed">"{selectedCase.draftReply}"</p>
-            </div>
-            <button onClick={() => setSelectedCase(null)} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black">Close</button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
 export default App;
