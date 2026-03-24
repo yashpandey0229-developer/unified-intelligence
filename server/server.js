@@ -11,8 +11,8 @@ app.use(express.json());
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log("✅ MongoDB Connected Successfully"))
-  .catch(err => console.log("❌ MongoDB Connection Error:", err));
+  .then(() => console.log("✅ MongoDB Atlas Active"))
+  .catch(err => console.log("❌ DB Link Failed:", err));
 
 const Complaint = mongoose.model('Complaint', new mongoose.Schema({
   text: String, category: String, priority: String, sla: String,
@@ -20,13 +20,13 @@ const Complaint = mongoose.model('Complaint', new mongoose.Schema({
   timestamp: { type: Date, default: Date.now }
 }));
 
+// GET: Dashboard Data
 app.get('/api/complaints', async (req, res) => {
-  try {
-    const data = await Complaint.find().sort({ timestamp: -1 });
-    res.json(data);
-  } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
+  const data = await Complaint.find().sort({ timestamp: -1 });
+  res.json(data);
 });
 
+// POST: Gemini 2.5 Flash Analysis
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
   try {
@@ -37,16 +37,16 @@ app.post('/api/analyze', async (req, res) => {
     const newEntry = new Complaint({ text, ...data });
     await newEntry.save();
     res.json(newEntry);
-  } catch (err) { res.status(500).json({ error: "AI Failed" }); }
+  } catch (err) { res.status(500).json({ error: "AI Engine Fault" }); }
 });
 
-// NEW: Delete logic for the Resolve button
+// DELETE: Resolve & Purge Logic
 app.delete('/api/complaints/:id', async (req, res) => {
   try {
     await Complaint.findByIdAndDelete(req.params.id);
     res.json({ success: true });
-  } catch (err) { res.status(500).json({ error: "Delete failed" }); }
+  } catch (err) { res.status(500).json({ error: "Purge Failed" }); }
 });
 
 const PORT = process.env.PORT || 8082;
-app.listen(PORT, () => console.log(`Backend Active on Port ${PORT}`));
+app.listen(PORT, () => console.log(`Backend Pulse on Port ${PORT}`));
