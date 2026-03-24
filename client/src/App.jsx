@@ -8,7 +8,7 @@ function App() {
   const [selectedCase, setSelectedCase] = useState(null);
 
   useEffect(() => {
-    fetch('/api/complaints')
+    fetch('https://unified-intelligence.vercel.app/api/complaints')
       .then(res => res.json())
       .then(data => setComplaints(Array.isArray(data) ? data : []))
       .catch(() => console.log("Syncing..."));
