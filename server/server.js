@@ -8,62 +8,44 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// 1. Initialize Gemini 2.5 Flash
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 
-// 2. MongoDB Connection
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("✅ MongoDB Connected Successfully"))
   .catch(err => console.log("❌ MongoDB Connection Error:", err));
 
-// 3. Complaint Schema
 const Complaint = mongoose.model('Complaint', new mongoose.Schema({
-  text: String,
-  category: String,
-  priority: String,
-  sla: String,
-  sentiment: String,
-  analysis: String,
-  draftReply: String,
+  text: String, category: String, priority: String, sla: String,
+  sentiment: String, analysis: String, draftReply: String,
   timestamp: { type: Date, default: Date.now }
 }));
 
-// 4. GET Route: Fetch all data from MongoDB for the Dashboard
 app.get('/api/complaints', async (req, res) => {
   try {
     const data = await Complaint.find().sort({ timestamp: -1 });
     res.json(data);
-  } catch (err) {
-    res.status(500).json({ error: "Failed to fetch complaints" });
-  }
+  } catch (err) { res.status(500).json({ error: "Fetch failed" }); }
 });
 
-// 5. POST Route: Analyze with Gemini 2.5 Flash and Save
 app.post('/api/analyze', async (req, res) => {
   const { text } = req.body;
-  if (!text) return res.status(400).json({ error: "Text is required" });
-
   try {
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-    const prompt = `Analyze: "${text}". Return ONLY a JSON object: {"category":"...","priority":"...","sla":"...","sentiment":"...","analysis":"...","draftReply":"..."}`;
-
+    const prompt = `Analyze: "${text}". Return ONLY JSON: {"category":"...","priority":"...","sla":"...","sentiment":"...","analysis":"...","draftReply":"..."}`;
     const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const rawText = response.text();
-
-    // Remove markdown code blocks if AI adds them
-    const cleanJson = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
-    const data = JSON.parse(cleanJson);
-
-    // Save to Database
+    const data = JSON.parse(result.response.text().replace(/```json|```/g, "").trim());
     const newEntry = new Complaint({ text, ...data });
     await newEntry.save();
-
     res.json(newEntry);
-  } catch (err) {
-    console.error("GEMINI_ERROR:", err.message);
-    res.status(500).json({ error: "AI Handshake Failed", message: err.message });
-  }
+  } catch (err) { res.status(500).json({ error: "AI Failed" }); }
+});
+
+// NEW: Delete logic for the Resolve button
+app.delete('/api/complaints/:id', async (req, res) => {
+  try {
+    await Complaint.findByIdAndDelete(req.params.id);
+    res.json({ success: true });
+  } catch (err) { res.status(500).json({ error: "Delete failed" }); }
 });
 
 const PORT = process.env.PORT || 8082;
