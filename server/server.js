@@ -47,8 +47,7 @@ app.delete('/api/complaints/:id', async (req, res) => {
     res.json({ success: true });
   } catch (err) { res.status(500).json({ error: "Purge Failed" }); }
 });
-
+module.exports = app;
 const PORT = process.env.PORT || 8082;
 app.listen(PORT, () => console.log(`Backend Pulse on Port ${PORT}`));
 // server/server.js ke end mein
-module.exports = app;
