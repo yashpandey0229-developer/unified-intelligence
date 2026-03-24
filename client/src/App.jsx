@@ -18,7 +18,8 @@ function App() {
     if (!input.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch('https://unified-intelligence.vercel.app/api/analyze', {
+      // App.jsx mein fetch calls ko wapas normal kar do:
+const res = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: input }),
